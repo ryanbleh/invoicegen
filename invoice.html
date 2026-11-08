@@ -1,0 +1,212 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Recycling Invoice</title>
+<style>
+  :root { --ink:#1d2433; --muted:#6b7280; --line:#e5e7eb; --accent:#2e7d4f; --bg:#f4f5f7; }
+  * { box-sizing:border-box; }
+  body { margin:0; font:15px/1.45 -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; color:var(--ink); background:var(--bg); }
+  .app { display:grid; grid-template-columns:320px 1fr; gap:24px; padding:24px; max-width:1200px; margin:0 auto; }
+  @media (max-width:900px){ .app{ grid-template-columns:1fr; padding:16px; } }
+
+  .panel { background:#fff; border:1px solid var(--line); border-radius:10px; padding:18px; align-self:start; }
+  label { display:block; font-size:13px; color:var(--muted); margin:12px 0 4px; }
+  label:first-child { margin-top:0; }
+  input, textarea { width:100%; padding:8px 10px; border:1px solid #d1d5db; border-radius:6px; font:inherit; }
+  textarea { resize:vertical; min-height:60px; }
+  .row { display:grid; grid-template-columns:minmax(0,1fr) minmax(0,1fr); gap:10px; }
+  input, textarea { min-width:0; max-width:100%; }
+  input[type=date] { padding-right:6px; }
+  .weeks { display:flex; flex-direction:column; gap:6px; margin-top:4px; }
+  .week { display:flex; justify-content:space-between; align-items:center; padding:8px 10px; border:1px solid var(--accent);
+          border-radius:6px; background:#eef7f1; cursor:pointer; user-select:none; font-size:14px; }
+  .week .tag { font-size:12px; color:var(--accent); font-weight:600; }
+  .week.off { border-color:#d1d5db; background:#fff; color:var(--muted); text-decoration:line-through; }
+  .week.off .tag { color:#b91c1c; text-decoration:none; }
+  .hint { font-size:12px; color:var(--muted); margin-top:4px; }
+  button.print { width:100%; margin-top:16px; padding:12px; font:inherit; font-weight:600; color:#fff; background:var(--accent);
+                 border:none; border-radius:6px; cursor:pointer; }
+
+  .sheet { background:#fff; border:1px solid var(--line); box-shadow:0 2px 12px rgba(0,0,0,.06);
+           width:8.5in; min-height:11in; padding:.7in; margin:0 auto; }
+  @media (max-width:1200px){ .sheet{ width:100%; min-height:auto; } }
+  .head { display:flex; justify-content:space-between; align-items:flex-start; }
+  .biz { font-size:28px; font-weight:700; }
+  .title { text-align:right; }
+  .title h2 { margin:0; font-size:28px; letter-spacing:.08em; color:var(--accent); }
+  .title div { color:var(--muted); font-size:14px; }
+  .billto { margin:36px 0 24px; }
+  .billto h4 { margin:0 0 4px; font-size:11px; text-transform:uppercase; letter-spacing:.06em; color:var(--muted); }
+  .billto div { white-space:pre-line; }
+  table { width:100%; border-collapse:collapse; }
+  th { text-align:left; font-size:11px; text-transform:uppercase; letter-spacing:.05em; color:var(--accent);
+       padding:8px 10px; border-bottom:2px solid var(--accent); }
+  td { padding:10px; border-bottom:1px solid var(--line); }
+  .num { text-align:right; }
+  tr { break-inside:avoid; }
+  .cols { display:grid; grid-template-columns:repeat(var(--cols), 1fr); gap:0 24px; align-items:start; }
+  .cols td { padding:7px 10px; }
+  .total td { font-size:18px; font-weight:700; border-bottom:none; border-top:2px solid var(--ink); }
+  .empty { color:var(--muted); text-align:center; padding:24px; }
+  .pay { margin:40px auto 0; max-width:360px; border:2px solid #008cff; border-radius:10px; padding:16px 20px; text-align:center; }
+  .pay .brand { font-size:22px; font-weight:800; font-style:italic; color:#008cff; letter-spacing:-.01em; }
+  .pay .handle { font-size:20px; font-weight:700; margin-top:6px; }
+  .pay .amt { color:var(--muted); margin-top:4px; }
+  .pay .qr svg { display:block; width:150px; height:150px; margin:12px auto 0; }
+  .pay .scan { font-size:12px; color:var(--muted); }
+  .other { margin:16px auto 0; max-width:420px; text-align:center; font-size:14px; }
+  .other b { color:var(--accent); white-space:nowrap; }
+  .thanks { margin-top:40px; text-align:center; color:var(--muted); }
+
+  @page { size:letter; margin:.5in; }
+  @media print {
+    body { background:#fff; }
+    .panel { display:none; }
+    .app { display:block; padding:0; }
+    .sheet { border:none; box-shadow:none; width:7.5in; min-height:0; padding:0; zoom:var(--fit, 1); }
+    .pay, .other { break-inside:avoid; }
+  }
+</style>
+</head>
+<body>
+<div class="app">
+  <div class="panel">
+    <label>Bill to</label>
+    <textarea id="client" placeholder="Name&#10;Address"></textarea>
+
+    <div class="row">
+      <div><label>First week</label><input id="start" type="date"></div>
+      <div><label>Last week</label><input id="end" type="date"></div>
+    </div>
+
+    <label>Price per week ($)</label>
+    <input id="rate" type="number" min="0" step="0.01" placeholder="20.00">
+
+    <label>Venmo username</label>
+    <input id="venmo" placeholder="@your-venmo">
+
+    <label>Your phone or email (for other payments)</label>
+    <input id="contact" placeholder="(503) 555-0100">
+
+    <label>Weeks</label>
+    <div class="weeks" id="weeks"></div>
+    <div class="hint">Click a week to skip it. Click again to put it back.</div>
+
+    <button class="print" id="print">Print / Save PDF</button>
+  </div>
+
+  <main class="sheet" id="sheet"></main>
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/qrcode-generator/1.4.4/qrcode.min.js"></script>
+<script>
+const $ = id => document.getElementById(id);
+const iso = d => d.toISOString().slice(0, 10);
+const parse = s => { const [y, m, d] = s.split('-').map(Number); return new Date(Date.UTC(y, m - 1, d)); };
+const fmt = (d, opt) => d.toLocaleDateString('en-US', { timeZone: 'UTC', ...opt });
+const money = n => n.toLocaleString('en-US', { style: 'currency', currency: 'USD' });
+const esc = s => String(s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+const load = () => { try { return JSON.parse(localStorage.getItem('recycling_invoice')) || {}; } catch { return {}; } };
+const save = s => { try { localStorage.setItem('recycling_invoice', JSON.stringify(s)); } catch {} };
+
+let skipped = new Set();
+
+// QR code that opens Venmo with the recipient, amount and note filled in
+function qrSvg(user, amount) {
+  if (typeof qrcode !== 'function') return '';
+  const url = 'https://venmo.com/?txn=pay&recipients=' + encodeURIComponent(user) +
+    (amount > 0 ? '&amount=' + amount.toFixed(2) : '') + '&note=' + encodeURIComponent('Recycling');
+  const qr = qrcode(0, 'M'); qr.addData(url); qr.make();
+  return `<div class="qr">${qr.createSvgTag({ cellSize: 4, margin: 0, scalable: true })}</div><div class="scan">Scan with your phone camera to pay</div>`;
+}
+
+function weekList() {
+  const out = [];
+  if (!$('start').value || !$('end').value) return out;
+  const end = parse($('end').value);
+  for (let d = parse($('start').value); d <= end && out.length < 60; d.setUTCDate(d.getUTCDate() + 7)) out.push(new Date(d));
+  return out;
+}
+
+function render() {
+  const weeks = weekList();
+  const rate = parseFloat($('rate').value) || 0;
+  const today = new Date();
+  const venmo = $('venmo').value.trim().replace(/^@/, '');
+  const contact = $('contact').value.trim();
+
+  // Week toggles
+  $('weeks').innerHTML = weeks.length ? weeks.map(w => {
+    const off = skipped.has(iso(w));
+    return `<div class="week ${off ? 'off' : ''}" data-d="${iso(w)}">
+      <span>${fmt(w, { weekday: 'short', month: 'short', day: 'numeric' })}</span>
+      <span class="tag">${off ? 'Skipped' : money(rate)}</span></div>`;
+  }).join('') : '<div class="hint">Pick the first and last week.</div>';
+
+  // Invoice
+  const billed = weeks.filter(w => !skipped.has(iso(w)));
+  // Long periods go into side-by-side columns so the page stays readable
+  const cols = billed.length <= 12 ? 1 : billed.length <= 26 ? 2 : 3;
+  const per = Math.ceil(billed.length / cols) || 0;
+  const chunks = billed.length ? Array.from({ length: cols }, (_, i) => billed.slice(i * per, (i + 1) * per)).filter(c => c.length) : [];
+  $('sheet').innerHTML = `
+    <div class="head">
+      <div class="biz">Recycling</div>
+      <div class="title"><h2>INVOICE</h2><div>${fmt(today, { month: 'long', day: 'numeric', year: 'numeric' })}</div></div>
+    </div>
+    <div class="billto"><h4>Bill to</h4><div>${esc($('client').value)}</div></div>
+    <div class="cols" style="--cols:${cols}">
+      ${chunks.map(chunk => `<table>
+        <thead><tr><th>Week of</th><th class="num">Amount</th></tr></thead>
+        <tbody>${chunk.map(w => `<tr><td>${fmt(w, { month: cols > 1 ? 'short' : 'long', day: 'numeric', year: 'numeric' })}</td><td class="num">${money(rate)}</td></tr>`).join('')}</tbody>
+      </table>`).join('')}
+    </div>
+    ${billed.length ? '' : '<div class="empty">No weeks yet.</div>'}
+    <table><tbody><tr class="total"><td>Total${billed.length ? ` (${billed.length} week${billed.length > 1 ? 's' : ''})` : ''}</td><td class="num">${money(rate * billed.length)}</td></tr></tbody></table>
+    ${venmo ? `<div class="pay">
+      <div class="brand">Pay with Venmo</div>
+      <div class="handle">@${esc(venmo)}</div>
+      <div class="amt">Amount: ${money(rate * billed.length)}</div>
+      ${qrSvg(venmo, rate * billed.length)}
+    </div>` : ''}
+    <div class="other"><b>Cash is also accepted.</b><br>
+      Need another way to pay? Just get in touch${contact ? `: <b>${esc(contact)}</b>` : '.'}</div>
+    <div class="thanks">Thank you!</div>`;
+
+  save({ venmo: $('venmo').value, contact: $('contact').value, client: $('client').value, start: $('start').value, end: $('end').value, rate: $('rate').value, skipped: [...skipped] });
+}
+
+$('weeks').onclick = e => {
+  const w = e.target.closest('.week'); if (!w) return;
+  skipped.has(w.dataset.d) ? skipped.delete(w.dataset.d) : skipped.add(w.dataset.d);
+  render();
+};
+['client', 'start', 'end', 'rate', 'venmo', 'contact'].forEach(id => $(id).addEventListener('input', render));
+// Shrink the invoice just enough to fit on one letter page (7.5in x 10in inside the margins)
+function fitToPage() {
+  const sheet = $('sheet');
+  sheet.style.cssText = 'width:7.5in;padding:0;min-height:0;border:0;box-shadow:none';
+  const pageH = 10 * 96 - 8;                     // 10in at 96px/in, small safety margin
+  const h = sheet.scrollHeight;
+  sheet.style.cssText = '';
+  document.documentElement.style.setProperty('--fit', h > pageH ? (pageH / h).toFixed(3) : 1);
+}
+window.addEventListener('beforeprint', fitToPage);
+$('print').onclick = () => { fitToPage(); window.print(); };
+
+// Restore last invoice, or default to the 4 most recent weeks
+const s = load();
+const t = new Date(), today = new Date(Date.UTC(t.getFullYear(), t.getMonth(), t.getDate()));
+$('client').value = s.client || '';
+$('venmo').value = s.venmo || '';
+$('contact').value = s.contact || '';
+$('rate').value = s.rate || '5';
+$('end').value = s.end || iso(today);
+$('start').value = s.start || iso(new Date(today.getTime() - 21 * 864e5));
+skipped = new Set(s.skipped || []);
+render();
+</script>
+</body>
+</html>
